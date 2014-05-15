@@ -2,6 +2,7 @@ CS909_ExSheetWk10
 =================
 To run the code, navigate to the directory in which ExSheetWk10.txt is located and run R.
 Within R type source("ExSheetWk10.txt").
+This may take some time to complete.
 
 Dataframes of performance measures for each classifier are stored in
 measures_nb   Naive Bayes
