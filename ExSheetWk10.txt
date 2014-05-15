@@ -28,8 +28,8 @@ loadRT <- function(){
     rt <- tm_map(rt, removePunctuation)
     rt <- tm_map(rt, stripWhitespace)
     rt <- tm_map(rt, tolower)
-    rt <- tm_map(rt, removeWords, c(stopwords("english"),"reuter","said","will"))
     rt <- tm_map(rt, stemDocument, language = "english")
+    rt <- tm_map(rt, removeWords, c(stopwords("english"),"reuter"))
 }
 loadDTM <- function() {
     rtdtm <-DocumentTermMatrix(rt)
