@@ -1,0 +1,328 @@
+#CS909 Data Mining
+#Exercises Week 10
+
+#http://cran.r-project.org/web/packages/tm/vignettes/tm.pdf
+#http://stackoverflow.com/questions/7927367/r-text-file-and-text-mining-how-to-load-data
+#http://heuristically.wordpress.com/2011/04/08/text-data-mining-twitter-r/
+#http://www.slideshare.net/whitish/textmining-with-r
+
+#meta(rt[[1]], tag="Topics")
+
+loadPackages <- function(){
+    install.packages("e1071")
+    install.packages("randomForest")
+    install.packages("tm")
+    install.packages("SnowballC")
+    install.packages("/dcs/pg11/phil/reuters/tm.corpus.Reuters21578/", repos = NULL, type="source")
+    require(e1071)
+    require(randomForest)
+    require(tm)
+    require(SnowballC)
+    require(tm.corpus.Reuters21578)
+    data(Reuters21578)
+}
+
+loadRT <- function(){
+    rt <- Reuters21578
+    rt <- tm_map(rt, removeNumbers)
+    rt <- tm_map(rt, removePunctuation)
+    rt <- tm_map(rt, stripWhitespace)
+    rt <- tm_map(rt, tolower)
+    rt <- tm_map(rt, removeWords, c(stopwords("english"),"reuter","said","will"))
+    rt <- tm_map(rt, stemDocument, language = "english")
+}
+loadDTM <- function() {
+    rtdtm <-DocumentTermMatrix(rt)
+    rtdtm <- removeSparseTerms(rtdtm, 0.9)
+}
+loadDF <- function() {
+    rtdf <- as.data.frame(inspect(rtdtm))
+}
+
+loadTopics <- function() {
+    d <- data.frame()
+    for (t in 1:length(topics)) {
+        for(i in 1:length(rt)) {
+            d[i,t] <- any(meta(rt[[i]],tag="Topics")==topics[t])
+        }
+    }
+    colnames(d) <- headings
+    d <- sapply(d,as.factor)
+    d
+}
+
+loadLewis <- function() {
+    d <- data.frame()
+    for (i in 1:length(rt)) {
+        d[i,"Lewis"] <- meta(rt[[i]],tag="LEWISSPLIT")
+    }
+    d
+}
+
+#SETUP COMMANDS
+print("Loading Packages")
+loadPackages()
+print("Setting topics of interest")
+topics <- c("earn","acq","money-fx","grain","crude","trade","interest","ship","wheat","corn")
+headings <- toupper(removePunctuation(topics))
+print("Pre-processing Reuters dataset")
+rt <- loadRT()
+print("Converting corpus to Document Term Matrix")
+rtdtm <- loadDTM()
+print("Converting DTM to Data Frame")
+rtdf <- loadDF()
+rtdf_raw <- rtdf
+print("Building Lewis Split column")
+lewisDF <- loadLewis()
+print("Building topic columns")
+topicDF <- loadTopics()
+print("Binding dataframes")
+rtdf <- cbind(topicDF,lewisDF,rtdf)
+print("Subsetting training data")
+train <- subset(rtdf,rtdf[,"Lewis"]=="TRAIN",select=-Lewis)
+print("Subsetting test data")
+test <- subset(rtdf,rtdf[,"Lewis"]=="TEST",select=-Lewis)
+
+print("Creating formulas")
+words <- paste(findFreqTerms(rtdtm),collapse="+")
+f1 <- as.formula(paste(headings[1], "~", words))
+f2 <- as.formula(paste(headings[2], "~", words))
+f3 <- as.formula(paste(headings[3], "~", words))
+f4 <- as.formula(paste(headings[4], "~", words))
+f5 <- as.formula(paste(headings[5], "~", words))
+f6 <- as.formula(paste(headings[6], "~", words))
+f7 <- as.formula(paste(headings[7], "~", words))
+f8 <- as.formula(paste(headings[8], "~", words))
+f9 <- as.formula(paste(headings[9], "~", words))
+f10 <- as.formula(paste(headings[10], "~", words))
+
+print("Creating Naive Bayes classifiers")
+print("NB topic 1")
+nb1 <- naiveBayes(f1,train)
+print("NB topic 2")
+nb2 <- naiveBayes(f2,train)
+print("NB topic 3")
+nb3 <- naiveBayes(f3,train)
+print("NB topic 4")
+nb4 <- naiveBayes(f4,train)
+print("NB topic 5")
+nb5 <- naiveBayes(f5,train)
+print("NB topic 6")
+nb6 <- naiveBayes(f6,train)
+print("NB topic 7")
+nb7 <- naiveBayes(f7,train)
+print("NB topic 8")
+nb8 <- naiveBayes(f8,train)
+print("NB topic 9")
+nb9 <- naiveBayes(f9,train)
+print("NB topic 10")
+nb10 <- naiveBayes(f10,train)
+
+print("Predicting classes with Naive Bayes")
+print("Predict topic 1")
+p1 <- predict(nb1,train)
+print("Predict topic 2")
+p2 <- predict(nb2,train)
+print("Predict topic 3")
+p3 <- predict(nb3,train)
+print("Predict topic 4")
+p4 <- predict(nb4,train)
+print("Predict topic 5")
+p5 <- predict(nb5,train)
+print("Predict topic 6")
+p6 <- predict(nb6,train)
+print("Predict topic 7")
+p7 <- predict(nb7,train)
+print("Predict topic 8")
+p8 <- predict(nb8,train)
+print("Predict topic 9")
+p9 <- predict(nb9,train)
+print("Predict topic 10")
+p10 <- predict(nb10,train)
+
+print("Building data frame of predictions")
+p_nb <- data.frame(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10)
+colnames(p_nb) <- headings
+
+print("Calculating Measures")
+measures_nb <- data.frame(c(NA,NA,NA,NA,NA,NA,NA),NA,NA,NA,NA,NA,NA,NA,NA,NA)
+colnames(measures_nb) <- headings
+rownames(measures_nb) <- c("TP","TN","FP","FN","Accuracy","Recall","Precision")
+for(i in c(1:length(headings))) {
+    print(paste("measures topic ",i))
+    measures_nb["TP",headings[i]] <- sum(as.numeric(train[which(train[,i]==TRUE),i]==p_nb[,i][which(train[,i]==TRUE)]))
+    measures_nb["TN",headings[i]] <- sum(as.numeric(train[which(train[,i]==FALSE),i]==p_nb[,i][which(train[,i]==FALSE)]))
+    measures_nb["FN",headings[i]] <- sum(as.numeric(train[which(train[,i]==TRUE),i]!=p_nb[,i][which(train[,i]==TRUE)]))
+    measures_nb["FP",headings[i]] <- sum(as.numeric(train[which(train[,i]==FALSE),i]!=p_nb[,i][which(train[,i]==FALSE)]))
+    measures_nb["Accuracy",headings[i]] <- round(sum(as.numeric(train[,i]==p_nb[,i])) / nrow(train),digits=2)
+    measures_nb["Recall",headings[i]] <- round(measures_nb["TP",headings[i]] / (measures_nb["TP",headings[i]] + measures_nb["FN",headings[i]]),digits=2)
+    measures_nb["Precision",headings[i]] <- round(measures_nb["TP",headings[i]] / (measures_nb["TP",headings[i]] + measures_nb["FP",headings[i]]),digits=2)
+}
+
+print("Calculating Micro/Macro Averages")
+avgs_nb <- data.frame(c(NA,NA,NA),NA)
+colnames(avgs_nb) <- c("Macro","Micro")
+rownames(avgs_nb) <- c("Accuracy","Recall","Precision")
+avgs_nb["Accuracy","Macro"] <- sum(apply(measures_nb,2,function(x) { (x["TP"]+x["TN"])/nrow(train) })) / ncol(measures_nb)
+avgs_nb["Recall","Macro"] <- sum(apply(measures_nb,2,function(x) { x["TP"]/(x["TP"]+x["FN"]) }))/ncol(measures_nb)
+avgs_nb["Precision","Macro"] <- sum(apply(measures_nb,2,function(x) { x["TP"]/(x["TP"]+x["FP"]) }))/ncol(measures_nb)
+avgs_nb["Recall","Micro"] <- sum(measures_nb["TP",]) / ( sum(measures_nb["TP",] + measures_nb["FN",]) )
+avgs_nb["Precision","Micro"] <- sum(measures_nb["TP",]) / ( sum(measures_nb["TP",] + measures_nb["FP",]) )
+
+
+print("Creating Random Forest classifiers")
+print("RF topic 1")
+rf1 <- randomForest(f1,train)
+print("RF topic 2")
+rf2 <- randomForest(f2,train)
+print("RF topic 3")
+rf3 <- randomForest(f3,train)
+print("RF topic 4")
+rf4 <- randomForest(f4,train)
+print("RF topic 5")
+rf5 <- randomForest(f5,train)
+print("RF topic 6")
+rf6 <- randomForest(f6,train)
+print("RF topic 7")
+rf7 <- randomForest(f7,train)
+print("RF topic 8")
+rf8 <- randomForest(f8,train)
+print("RF topic 9")
+rf9 <- randomForest(f9,train)
+print("RF topic 10")
+rf10 <- randomForest(f10,train)
+
+print("Predicting classes with Random Forest")
+print("Predict topic 1")
+p1 <- predict(rf1,train)
+print("Predict topic 2")
+p2 <- predict(rf2,train)
+print("Predict topic 3")
+p3 <- predict(rf3,train)
+print("Predict topic 4")
+p4 <- predict(rf4,train)
+print("Predict topic 5")
+p5 <- predict(rf5,train)
+print("Predict topic 6")
+p6 <- predict(rf6,train)
+print("Predict topic 7")
+p7 <- predict(rf7,train)
+print("Predict topic 8")
+p8 <- predict(rf8,train)
+print("Predict topic 9")
+p9 <- predict(rf9,train)
+print("Predict topic 10")
+p10 <- predict(rf10,train)
+
+print("Building data frame of predictions")
+p_rf <- data.frame(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10)
+colnames(p_rf) <- headings
+
+print("Calculating Measures")
+measures_rf <- data.frame(c(NA,NA,NA,NA,NA,NA,NA),NA,NA,NA,NA,NA,NA,NA,NA,NA)
+colnames(measures_rf) <- headings
+rownames(measures_rf) <- c("TP","TN","FP","FN","Accuracy","Recall","Precision")
+for(i in c(1:length(headings))) {
+    print(paste("Measures topic ",i))
+    measures_rf["TP",headings[i]] <- sum(as.numeric(train[which(train[,i]==TRUE),i]==p_rf[,i][which(train[,i]==TRUE)]))
+    measures_rf["TN",headings[i]] <- sum(as.numeric(train[which(train[,i]==FALSE),i]==p_rf[,i][which(train[,i]==FALSE)]))
+    measures_rf["FN",headings[i]] <- sum(as.numeric(train[which(train[,i]==TRUE),i]!=p_rf[,i][which(train[,i]==TRUE)]))
+    measures_rf["FP",headings[i]] <- sum(as.numeric(train[which(train[,i]==FALSE),i]!=p_rf[,i][which(train[,i]==FALSE)]))
+    measures_rf["Accuracy",headings[i]] <- round(sum(as.numeric(train[,i]==p_rf[,i])) / nrow(train),digits=2)
+    measures_rf["Recall",headings[i]] <- round(measures_rf["TP",headings[i]] / (measures_rf["TP",headings[i]] + measures_rf["FN",headings[i]]),digits=2)
+    measures_rf["Precision",headings[i]] <- round(measures_rf["TP",headings[i]] / (measures_rf["TP",headings[i]] + measures_rf["FP",headings[i]]),digits=2)
+}
+
+print("Calculating Micro/Macro Averages")
+avgs_rf <- data.frame(c(NA,NA,NA),NA)
+colnames(avgs_rf) <- c("Macro","Micro")
+rownames(avgs_rf) <- c("Accuracy","Recall","Precision")
+avgs_rf["Accuracy","Macro"] <- sum(apply(measures_rf,2,function(x) { (x["TP"]+x["TN"])/nrow(train) })) / ncol(measures_rf)
+avgs_rf["Recall","Macro"] <- sum(apply(measures_rf,2,function(x) { x["TP"]/(x["TP"]+x["FN"]) }))/ncol(measures_rf)
+avgs_rf["Precision","Macro"] <- sum(apply(measures_rf,2,function(x) { x["TP"]/(x["TP"]+x["FP"]) }))/ncol(measures_rf)
+avgs_rf["Recall","Micro"] <- sum(measures_rf["TP",]) / ( sum(measures_rf["TP",] + measures_rf["FN",]) )
+avgs_rf["Precision","Micro"] <- sum(measures_rf["TP",]) / ( sum(measures_rf["TP",] + measures_rf["FP",]) )
+
+
+print("Creating SVM classifiers")
+print("SVM topic 1")
+svm1 <- svm(f1,train)
+print("SVM topic 2")
+svm2 <- svm(f2,train)
+print("SVM topic 3")
+svm3 <- svm(f3,train)
+print("SVM topic 4")
+svm4 <- svm(f4,train)
+print("SVM topic 5")
+svm5 <- svm(f5,train)
+print("SVM topic 6")
+svm6 <- svm(f6,train)
+print("SVM topic 7")
+svm7 <- svm(f7,train)
+print("SVM topic 8")
+svm8 <- svm(f8,train)
+print("SVM topic 9")
+svm9 <- svm(f9,train)
+print("SVM topic 10")
+svm10 <- svm(f10,train)
+
+print("Predicting classes with Random Forest")
+print("Predict topic 1")
+p1 <- predict(svm1,train)
+print("Predict topic 2")
+p2 <- predict(svm2,train)
+print("Predict topic 3")
+p3 <- predict(svm3,train)
+print("Predict topic 4")
+p4 <- predict(svm4,train)
+print("Predict topic 5")
+p5 <- predict(svm5,train)
+print("Predict topic 6")
+p6 <- predict(svm6,train)
+print("Predict topic 7")
+p7 <- predict(svm7,train)
+print("Predict topic 8")
+p8 <- predict(svm8,train)
+print("Predict topic 9")
+p9 <- predict(svm9,train)
+print("Predict topic 10")
+p10 <- predict(svm10,train)
+
+print("Building data frame of predictions")
+p_svm <- data.frame(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10)
+colnames(p_svm) <- headings
+
+print("Calculating Measures")
+measures_svm <- data.frame(c(NA,NA,NA,NA,NA,NA,NA),NA,NA,NA,NA,NA,NA,NA,NA,NA)
+colnames(measures_svm) <- headings
+rownames(measures_svm) <- c("TP","TN","FP","FN","Accuracy","Recall","Precision")
+for(i in c(1:length(headings))) {
+    print(paste("Measures topic ",i))
+    measures_svm["TP",headings[i]] <- sum(as.numeric(train[which(train[,i]==TRUE),i]==p_svm[,i][which(train[,i]==TRUE)]))
+    measures_svm["TN",headings[i]] <- sum(as.numeric(train[which(train[,i]==FALSE),i]==p_svm[,i][which(train[,i]==FALSE)]))
+    measures_svm["FN",headings[i]] <- sum(as.numeric(train[which(train[,i]==TRUE),i]!=p_svm[,i][which(train[,i]==TRUE)]))
+    measures_svm["FP",headings[i]] <- sum(as.numeric(train[which(train[,i]==FALSE),i]!=p_svm[,i][which(train[,i]==FALSE)]))
+    measures_svm["Accuracy",headings[i]] <- round(sum(as.numeric(train[,i]==p_svm[,i])) / nrow(train),digits=2)
+    measures_svm["Recall",headings[i]] <- round(measures_svm["TP",headings[i]] / (measures_svm["TP",headings[i]] + measures_svm["FN",headings[i]]),digits=2)
+    measures_svm["Precision",headings[i]] <- round(measures_svm["TP",headings[i]] / (measures_svm["TP",headings[i]] + measures_svm["FP",headings[i]]),digits=2)
+}
+
+print("Calculating Micro/Macro Averages")
+avgs_svm <- data.frame(c(NA,NA,NA),NA)
+colnames(avgs_svm) <- c("Macro","Micro")
+rownames(avgs_svm) <- c("Accuracy","Recall","Precision")
+avgs_svm["Accuracy","Macro"] <- sum(apply(measures_svm,2,function(x) { (x["TP"]+x["TN"])/nrow(train) })) / ncol(measures_svm)
+avgs_svm["Recall","Macro"] <- sum(apply(measures_svm,2,function(x) { x["TP"]/(x["TP"]+x["FN"]) }))/ncol(measures_svm)
+avgs_svm["Precision","Macro"] <- sum(apply(measures_svm,2,function(x) { x["TP"]/(x["TP"]+x["FP"]) }))/ncol(measures_svm)
+avgs_svm["Recall","Micro"] <- sum(measures_svm["TP",]) / ( sum(measures_svm["TP",] + measures_svm["FN",]) )
+avgs_svm["Precision","Micro"] <- sum(measures_svm["TP",]) / ( sum(measures_svm["TP",] + measures_svm["FP",]) )
+
+print("Measures & Averages Naive Bayes")
+print(measures_nb)
+print(avgs_nb)
+print("Measures & Averages Random Forest")
+print(measures_rf)
+print(avgs_rf)
+print("Measures & Averages SVM")
+print(measures_svm)
+print(avgs_svm)
