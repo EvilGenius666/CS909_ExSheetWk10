@@ -266,7 +266,7 @@ svm9 <- svm(f9,train)
 print("SVM topic 10")
 svm10 <- svm(f10,train)
 
-print("Predicting classes with Random Forest")
+print("Predicting classes with SVM")
 print("Predict topic 1")
 p1 <- predict(svm1,train)
 print("Predict topic 2")
