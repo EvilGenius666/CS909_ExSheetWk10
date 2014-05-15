@@ -8,8 +8,10 @@ Dataframes of performance measures for each classifier are stored in
 measures_nb   Naive Bayes
 measures_rf   Random Forest
 measures_svm  SVM
+measures_test Random Forest using Test Data
 
 Macro and micro averaged precision and recall are stored in
 avgs_nb   Naive Bayes
 avgs_rf   Random Forest
 avgs_svm  SVM
+avgs_test Random Forest using Test Data
